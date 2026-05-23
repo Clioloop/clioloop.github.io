@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clioloop</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+
+
+:root {
+  --magenta: #ff00e0;
+  --gold: #ffd700;
+  --text: #f0e6ff;
+  --text-dim: rgba(240, 230, 255, 0.6);
+  --bg: #0a0a0f;
+  --fade-dur: 2.5s;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace; }
+
+.video-layer {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  object-fit: cover; pointer-events: none;
+}
+#bg-loop { z-index: 0; }
+#intro-video {
+  z-index: 2;
+  transition: opacity var(--fade-dur) ease-out;
+}
+#intro-video.fade-out { opacity: 0; }
+
+#content {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  z-index: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity 1.5s ease-out;
+  pointer-events: none;
+  padding: 2rem;
+  background: linear-gradient(180deg, rgba(10,10,15,0) 0%, rgba(10,10,15,0.5) 50%, rgba(10,10,15,0.7) 100%);
+}
+#content.visible { opacity: 1; pointer-events: auto; }
+
+.brand { text-align: center; margin-bottom: 2rem; margin-top: -5vh; transform: translateY(20px); opacity: 0; transition: all 0.8s ease-out 0.3s; }
+#content.visible .brand { transform: translateY(0); opacity: 1; }
+
+.brand-symbol {
+  font-size: clamp(2.5rem, 8vw, 4rem); line-height: 1;
+  color: #fff;
+  letter-spacing: 0.08em;
+  font-weight: 300;
+  text-shadow: 0 0 40px rgba(255,255,255,0.08);
+  opacity: 0.9;
+}
+
+.brand-tagline {
+  font-size: clamp(0.8rem, 2.5vw, 1.1rem); color: rgba(255, 255, 255, 0.8); margin-top: 0.75rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.4);
+}
+
+.brand-desc {
+  font-size: clamp(0.6rem, 1.8vw, 0.8rem); color: rgba(255, 255, 255, 0.5);
+  max-width: 480px; margin: 0.8rem auto 0; line-height: 1.6;
+  text-shadow: 0 0 15px rgba(0,0,0,0.6);
+}
+
+.brand-note {
+  font-size: clamp(0.55rem, 1.5vw, 0.7rem); color: rgba(255, 255, 255, 0.5);
+  max-width: 480px; margin: 0.6rem auto 0; line-height: 1.5;
+  font-style: italic;
+  text-shadow: 0 0 15px rgba(0,0,0,0.6);
+}
+
+.features { display: flex; gap: clamp(0.8rem, 2vw, 1.5rem); margin-bottom: clamp(1.5rem, 3vw, 2.5rem); flex-wrap: wrap; justify-content: center; max-width: 800px; }
+.feature { text-align: center; transform: translateY(20px); opacity: 0; transition: all 0.6s ease-out; }
+#content.visible .feature:nth-child(1) { transition-delay: 0.4s; transform: translateY(0); opacity: 1; }
+#content.visible .feature:nth-child(2) { transition-delay: 0.55s; transform: translateY(0); opacity: 1; }
+#content.visible .feature:nth-child(3) { transition-delay: 0.7s; transform: translateY(0); opacity: 1; }
+#content.visible .feature:nth-child(4) { transition-delay: 0.85s; transform: translateY(0); opacity: 1; }
+#content.visible .feature:nth-child(5) { transition-delay: 1.0s; transform: translateY(0); opacity: 1; }
+
+.feature-icon { font-size: clamp(1.5rem, 4vw, 2rem); margin-bottom: 0.5rem; filter: drop-shadow(0 0 10px rgba(255,215,0,0.2)); }
+.feature-label { font-size: clamp(0.7rem, 2vw, 0.85rem); color: rgba(255, 255, 255, 0.85); letter-spacing: 0.12em; text-transform: uppercase; text-shadow: 0 0 15px rgba(0,0,0,0.6); }
+.feature-desc { font-size: clamp(0.55rem, 1.5vw, 0.7rem); color: rgba(240, 230, 255, 0.55); margin-top: 0.3rem; max-width: 220px; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+
+.links { display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; transform: translateY(20px); opacity: 0; transition: all 0.8s ease-out 1.1s; }
+#content.visible .links { transform: translateY(0); opacity: 1; }
+
+.link-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: var(--text); text-decoration: none;
+  font-size: clamp(0.65rem, 2vw, 0.8rem); letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.link-btn::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--magenta), var(--gold));
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.link-btn:hover::before { opacity: 0.15; }
+.link-btn:hover {
+  border-color: var(--gold); transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(255, 215, 0, 0.1);
+}
+.link-btn.primary {
+  background: linear-gradient(135deg, rgba(255, 0, 224, 0.2), rgba(255, 215, 0, 0.2));
+  border-color: rgba(255, 215, 0, 0.3);
+}
+.link-btn.primary:hover {
+  border-color: var(--gold);
+  box-shadow: 0 8px 30px rgba(255, 215, 0, 0.2);
+}
+.link-btn span { position: relative; z-index: 1; }
+
+.footer {
+  position: fixed; bottom: 1.5rem; left: 0; width: 100%;
+  text-align: center; z-index: 3;
+  opacity: 0; transition: opacity 1s ease-out;
+}
+#content.visible .footer { opacity: 1; }
+.footer.show { opacity: 1; }
+.footer-text { font-size: 0.7rem; color: rgba(255, 255, 255, 0.5); letter-spacing: 0.15em; text-shadow: 0 0 15px rgba(0,0,0,0.8), 0 0 30px rgba(0,0,0,0.4); }
+
+.corner {
+  position: fixed; z-index: 3;
+  font-size: 0.7rem; color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 15px rgba(0,0,0,0.8);
+}
+.corner-tl { top: 1.5rem; left: 1.5rem; }
+
+#skip-hint {
+  position: fixed; bottom: 3rem; right: 2rem; z-index: 5;
+  font-size: 0.6rem; color: rgba(240, 230, 255, 0.3);
+  cursor: pointer; letter-spacing: 0.05em;
+  opacity: 0; transition: opacity 1s ease;
+  background: rgba(0,0,0,0.4); padding: 0.4rem 0.8rem;
+  border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);
+}
+#skip-hint.show { opacity: 1; }
+#skip-hint:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+
+#mute-btn {
+  position: fixed; bottom: 5.5rem; right: 2rem; z-index: 5;
+  font-size: 0.6rem; color: rgba(240, 230, 255, 0.3);
+  cursor: pointer; letter-spacing: 0.05em;
+  opacity: 0; transition: opacity 1s ease;
+  background: rgba(0,0,0,0.4); padding: 0.4rem 0.8rem;
+  border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);
+}
+#mute-btn.show { opacity: 1; }
+#mute-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+
+#progress {
+  position: fixed; top: 0; left: 0; height: 2px; z-index: 10;
+  background: linear-gradient(90deg, var(--magenta), var(--gold));
+  transition: width 0.5s linear;
+  width: 0%;
+}
+
+#overlay {
+  position: fixed; inset: 0; z-index: 20;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  background: var(--bg);
+  opacity: 1;
+  transition: opacity 1s ease-out;
+}
+#overlay.hidden { opacity: 0; pointer-events: none; }
+
+/* ── Install modal ── */
+#modal {
+  position: fixed; inset: 0; z-index: 30;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+#modal.open { display: flex; }
+
+.modal-box {
+  background: rgba(20,20,30,0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 2rem;
+  max-width: 480px;
+  width: 90%;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute; top: 0.75rem; right: 0.75rem;
+  background: none; border: none; color: var(--text-dim);
+  font-size: 1.2rem; cursor: pointer; padding: 0.25rem;
+  line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+
+.modal-title {
+  font-size: 1rem; margin-bottom: 1.25rem;
+  background: linear-gradient(135deg, var(--magenta), var(--gold));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-step {
+  display: flex; gap: 0.75rem; margin-bottom: 1rem;
+  align-items: flex-start;
+}
+.modal-step-num {
+  flex-shrink: 0; width: 1.5rem; height: 1.5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--magenta), var(--gold));
+  color: #0a0a0f; font-size: 0.7rem; font-weight: bold;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 0.1rem;
+}
+.modal-step-text {
+  font-size: 0.75rem; color: var(--text-dim); line-height: 1.5;
+}
+.modal-step-text strong { color: var(--text); }
+
+.modal-cmd {
+  background: rgba(0,0,0,0.4); border: 1px solid rgba(255,215,0,0.2);
+  border-radius: 4px; padding: 0.75rem 1rem; margin: 1rem 0;
+  font-size: 0.7rem; color: var(--gold); word-break: break-all;
+  line-height: 1.4;
+}
+
+.modal-expect {
+  font-size: 0.65rem; color: rgba(240,230,255,0.35);
+  line-height: 1.5; margin-top: 0.5rem;
+  padding: 0.75rem; border-left: 1px solid rgba(255,215,0,0.1);
+}
+
+.overlay-symbol {
+  font-size: clamp(2.5rem, 7vw, 4rem); line-height: 1;
+  background: linear-gradient(135deg, #7c3aed, #a855f7, #c084fc);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  filter: drop-shadow(0 0 30px rgba(124, 58, 237, 0.4)) drop-shadow(0 0 60px rgba(168, 85, 247, 0.2));
+  margin-bottom: 2rem;
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 20px rgba(124,58,237,0.3)) drop-shadow(0 0 40px rgba(168,85,247,0.15)); }
+  50% { filter: drop-shadow(0 0 40px rgba(124,58,237,0.5)) drop-shadow(0 0 80px rgba(168,85,247,0.25)); }
+}
+.overlay-prompt {
+  font-size: clamp(0.7rem, 2vw, 0.9rem);
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 0.6rem 1.5rem;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+#overlay:hover .overlay-prompt {
+  border-color: rgba(168,85,247,0.3);
+  background: rgba(168,85,247,0.08);
+  color: rgba(255,255,255,0.9);
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div id="overlay">
+  <div class="overlay-symbol">∞ Clioloop ∞</div>
+  <div class="overlay-prompt">Click to meet Clioloop</div>
+</div>
+
+<video id="bg-loop" class="video-layer" autoplay loop muted playsinline preload="auto">
+  <source src="videos/loop-faststart.webm" type="video/webm">
+  <source src="videos/loop-faststart.mp4" type="video/mp4">
+</video>
+
+<video id="intro-video" class="video-layer" playsinline preload="auto">
+  <source src="videos/intro-faststart.webm" type="video/webm">
+  <source src="videos/intro-faststart.mp4" type="video/mp4">
+</video>
+
+<div id="content">
+  <div class="brand">
+    <div class="brand-symbol">∞ Clioloop ∞</div>
+    <div class="brand-tagline">an open source self evolving AI agent</div>
+    <div class="brand-desc">An open platform that evolves itself — running its own pipeline to gather, evaluate, and ship updates automatically.</div>
+    <div class="brand-note">The pipeline runs entirely on Clioloop agents in the background — not visible in the open source code.</div>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">⟳</div>
+      <div class="feature-label">Self-Evolving</div>
+      <div class="feature-desc">Clioloop runs its own pipeline — gathering community input, evaluating it, and rolling out updates entirely on its own. Also available on demand.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">↑</div>
+      <div class="feature-label">Self-Improving</div>
+      <div class="feature-desc">A built-in loop that continuously reviews, refines, and optimizes agent skills and behaviors in the background.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">✦</div>
+      <div class="feature-label">Autonomous</div>
+      <div class="feature-desc">Multi-agent delegation, cron jobs, background processes that run on your schedule.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">◈</div>
+      <div class="feature-label">Everywhere</div>
+      <div class="feature-desc">CLI, TUI, and gateway — Telegram, Discord, Slack, WhatsApp, and more.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">◇</div>
+      <div class="feature-label">Extensible</div>
+      <div class="feature-desc">Plugins, model providers, skills, memory backends — build anything.</div>
+    </div>
+  </div>
+
+  <div class="links">
+    <a class="link-btn primary" href="https://github.com/Clioloop/Clioloop" target="_blank"><span>⎇ GitHub</span></a>
+    <a class="link-btn" href="https://opencode.ai" target="_blank"><span>⌘ Docs</span></a>
+    <a class="link-btn" href="#" id="install-btn"><span>⤓ Install</span></a>
+  </div>
+</div>
+
+<div class="corner corner-tl">clioloop v0.1.0</div>
+
+<div id="skip-hint">skip intro ⏎</div>
+<div id="mute-btn">sound ♪</div>
+
+<div class="footer">
+  <div class="footer-text">released under the MIT license — backed by professional human developers when things break</div>
+</div>
+
+<div id="modal">
+  <div class="modal-box">
+    <button class="modal-close" id="modal-close">✕</button>
+    <div class="modal-title">▸ Install Clioloop on Windows</div>
+
+    <div class="modal-step">
+      <div class="modal-step-num">1</div>
+      <div class="modal-step-text">Press <strong>Win + R</strong>, type <strong>powershell</strong>, press Enter</div>
+    </div>
+
+    <div class="modal-step">
+      <div class="modal-step-num">2</div>
+      <div class="modal-step-text">Paste the command below and press <strong>Enter</strong></div>
+    </div>
+
+    <div class="modal-cmd" id="modal-cmd"></div>
+
+    <div class="modal-step">
+      <div class="modal-step-num">3</div>
+      <div class="modal-step-text">Wait 2–5 minutes — it installs <strong>Python, Git, Node.js</strong> and all dependencies automatically</div>
+    </div>
+
+    <div class="modal-expect">
+      No admin rights needed. Everything is installed to %LOCALAPPDATA%\clioloop\.
+      After completion, close and reopen PowerShell, then type <strong>clioloop</strong> to start.
+    </div>
+  </div>
+</div>
+
+<script>
+const overlay = document.getElementById('overlay');
+const introVideo = document.getElementById('intro-video');
+const bgLoop = document.getElementById('bg-loop');
+const content = document.getElementById('content');
+const skipHint = document.getElementById('skip-hint');
+const muteBtn = document.getElementById('mute-btn');
+const progress = document.getElementById('progress');
+const footer = document.querySelector('.footer');
+
+const FADE_START = 87;
+const FADE_DUR = 2.5;
+let hasTransitioned = false;
+let started = false;
+
+bgLoop.volume = 0;
+
+function startExperience() {
+  if (started) return;
+  started = true;
+  overlay.classList.add('hidden');
+  setTimeout(() => { overlay.style.display = 'none'; }, 1000);
+
+  introVideo.currentTime = 0;
+  introVideo.play().catch(() => {});
+  bgLoop.play().catch(() => {});
+
+  setTimeout(() => skipHint.classList.add('show'), 3000);
+  setTimeout(() => muteBtn.classList.add('show'), 3000);
+  setTimeout(() => footer.classList.add('show'), 500);
+}
+
+overlay.addEventListener('click', startExperience);
+overlay.addEventListener('touchend', (e) => { e.preventDefault(); startExperience(); });
+
+introVideo.addEventListener('timeupdate', () => {
+  if (hasTransitioned) return;
+  const t = introVideo.currentTime;
+  progress.style.width = Math.min((t / FADE_START) * 100, 100) + '%';
+  if (t >= FADE_START) {
+    hasTransitioned = true;
+    progress.style.width = '100%';
+    startTransition();
+  }
+});
+
+function startTransition() {
+  introVideo.classList.add('fade-out');
+  setTimeout(() => content.classList.add('visible'), 500);
+}
+
+skipHint.addEventListener('click', skipIntro);
+muteBtn.addEventListener('click', toggleMute);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && skipHint.classList.contains('show') && !hasTransitioned) skipIntro();
+});
+
+function skipIntro() {
+  if (hasTransitioned) return;
+  introVideo.muted = true;
+  introVideo.currentTime = FADE_START;
+}
+
+let isMuted = false;
+function toggleMute() {
+  isMuted = !isMuted;
+  introVideo.muted = isMuted;
+  muteBtn.textContent = isMuted ? 'unmute ♪' : 'mute ♪';
+}
+
+const modal = document.getElementById('modal');
+const modalCmd = document.getElementById('modal-cmd');
+const modalClose = document.getElementById('modal-close');
+const winCmd = 'iex (irm https://raw.githubusercontent.com/Clioloop/Clioloop/main/scripts/install.ps1)';
+const nixCmd = 'curl -fsSL https://raw.githubusercontent.com/Clioloop/Clioloop/main/scripts/install.sh | bash';
+
+document.getElementById('install-btn').addEventListener('click', (e) => {
+  e.preventDefault();
+  const isWin = navigator.platform.toLowerCase().includes('win');
+
+  if (isWin) {
+    modalCmd.textContent = winCmd;
+    navigator.clipboard.writeText(winCmd);
+    modal.classList.add('open');
+  } else {
+    navigator.clipboard.writeText(nixCmd);
+    const btn = e.currentTarget;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span>✓ Copied — paste in your terminal</span>';
+    btn.style.borderColor = 'rgba(255,215,0,0.5)';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.borderColor = ''; }, 4000);
+  }
+});
+
+modalClose.addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+</script>
+</body>
+</html>
